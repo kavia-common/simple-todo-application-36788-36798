@@ -30,7 +30,10 @@ else:
 conn = sqlite3.connect(DB_NAME)
 cursor = conn.cursor()
 
-# Create initial schema
+# Ensure foreign keys and reasonable defaults
+cursor.execute("PRAGMA foreign_keys = ON")
+
+# Create initial schema (preserve existing tables)
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS app_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +43,6 @@ cursor.execute("""
     )
 """)
 
-# Create a sample users table as an example
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +52,28 @@ cursor.execute("""
     )
 """)
 
-# Insert initial data
+# Create todos table aligned with requested schema
+# id: INTEGER PRIMARY KEY AUTOINCREMENT
+# text: TEXT NOT NULL
+# completed: INTEGER DEFAULT 0 (0=false, 1=true)
+# created_at: DATETIME DEFAULT CURRENT_TIMESTAMP
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS todos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT NOT NULL,
+        completed INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+""")
+
+# Seed minimal sample data if table is empty
+cursor.execute("SELECT COUNT(*) FROM todos")
+todo_count = cursor.fetchone()[0]
+if todo_count == 0:
+    cursor.execute("INSERT INTO todos (text, completed) VALUES (?, ?)", ("Sample task: try adding a todo", 0))
+    cursor.execute("INSERT INTO todos (text, completed) VALUES (?, ?)", ("Sample task: toggle me complete", 1))
+
+# Insert/refresh initial app_info data
 cursor.execute("INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)", 
                ("project_name", "todo_database"))
 cursor.execute("INSERT OR REPLACE INTO app_info (key, value) VALUES (?, ?)", 
@@ -68,6 +91,10 @@ table_count = cursor.fetchone()[0]
 
 cursor.execute("SELECT COUNT(*) FROM app_info")
 record_count = cursor.fetchone()[0]
+
+# Count todos for info
+cursor.execute("SELECT COUNT(*) FROM todos")
+todos_records = cursor.fetchone()[0]
 
 conn.close()
 
@@ -116,6 +143,7 @@ print("")
 print("Database statistics:")
 print(f"  Tables: {table_count}")
 print(f"  App info records: {record_count}")
+print(f"  Todos records: {todos_records}")
 
 # If sqlite3 CLI is available, show how to use it
 try:
